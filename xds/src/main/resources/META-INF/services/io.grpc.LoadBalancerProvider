@@ -1,2 +1,0 @@
-io.grpc.xds.CdsLoadBalancerProvider
-io.grpc.xds.XdsLoadBalancerProvider
