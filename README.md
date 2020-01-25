@@ -9,7 +9,7 @@ git clone https://github.com/grpc/grpc-java.git
 pushd grpc-java
 
 # Build grpc-library from master branch and publish to maven local.
-./gradlew publishToMavenLocal -x test -PskipCodegen=true
+./gradlew publishToMavenLocal -x test -PskipCodegen=true -PskipAndroid=true
 
 # Build example application.
 git checkout xds-staging
