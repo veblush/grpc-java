@@ -146,7 +146,7 @@ public final class AltsTsiFrameProtector implements TsiFrameProtector {
       }
       long protectedBytes = frameNum * (HEADER_BYTES + suffixBytes) + unprotectedBytes;
 
-      ByteBuf protectedBuf = alloc.directBuffer(Ints.checkedCast(protectedBytes));
+      ByteBuf protectedBuf = alloc.heapBuffer(Ints.checkedCast(protectedBytes));
       try {
         int bufferIdx = 0;
         for (int frameIdx = 0; frameIdx < frameNum; ++frameIdx) {
@@ -200,8 +200,8 @@ public final class AltsTsiFrameProtector implements TsiFrameProtector {
     Unprotector(ChannelCrypterNetty crypter, ByteBufAllocator alloc) {
       this.crypter = crypter;
       this.suffixBytes = crypter.getSuffixLength();
-      this.header = alloc.directBuffer(HEADER_BYTES);
-      this.firstFrameTag = alloc.directBuffer(suffixBytes);
+      this.header = alloc.heapBuffer(HEADER_BYTES);
+      this.firstFrameTag = alloc.heapBuffer(suffixBytes);
     }
 
     private void addUnhandled(ByteBuf in) {
@@ -331,7 +331,7 @@ public final class AltsTsiFrameProtector implements TsiFrameProtector {
       // We leave space for suffixBytes to allow for in-place encryption. This allows for calling
       // doFinal in the JCE implementation which can be optimized better than update and doFinal.
       ByteBuf unprotectedBuf =
-          alloc.directBuffer(
+          alloc.heapBuffer(
               Ints.checkedCast(requiredUnprotectedBytesCompleteFrames + suffixBytes));
       try {
 
