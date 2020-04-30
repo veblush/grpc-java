@@ -17,7 +17,7 @@
 package io.grpc.alts.internal;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Verify.verify;
+//import static com.google.common.base.Verify.verify;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.netty.buffer.ByteBuf;
@@ -99,7 +99,8 @@ final class AltsChannelCrypter implements ChannelCrypterNetty {
   }
 
   @Override
-  public void decrypt(ByteBuf outBuf, ByteBuf ciphertextAndTagDirect) throws GeneralSecurityException {
+  public void decrypt(
+      ByteBuf outBuf, ByteBuf ciphertextAndTagDirect) throws GeneralSecurityException {
     byte[] tempArr = new byte[ciphertextAndTagDirect.readableBytes()];
 
     // Copy ciphertext and tag into tempArr.
@@ -110,7 +111,7 @@ final class AltsChannelCrypter implements ChannelCrypterNetty {
     }
 
     decryptInternal(outBuf, tempArr);
- }
+  }
 
   private void decryptInternal(ByteBuf outBuf, byte[] tempArr) throws GeneralSecurityException {
     // Perform in-place decryption on tempArr.
