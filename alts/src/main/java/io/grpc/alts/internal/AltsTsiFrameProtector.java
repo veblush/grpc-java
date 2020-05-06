@@ -23,6 +23,7 @@ import static com.google.common.base.Verify.verify;
 import com.google.common.primitives.Ints;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.Unpooled;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.List;
@@ -331,10 +332,10 @@ public final class AltsTsiFrameProtector implements TsiFrameProtector {
       // We leave space for suffixBytes to allow for in-place encryption. This allows for calling
       // doFinal in the JCE implementation which can be optimized better than update and doFinal.
       ByteBuf unprotectedBuf =
-          alloc.directBuffer(
-              Ints.checkedCast(requiredUnprotectedBytesCompleteFrames + suffixBytes));
+          Unpooled.wrappedBuffer(new byte[
+              Ints.checkedCast(requiredUnprotectedBytesCompleteFrames + suffixBytes)]);
+      unprotectedBuf.resetWriterIndex();
       try {
-
         ByteBuf out = writeSlice(unprotectedBuf, firstFrameUnprotectedLen + suffixBytes);
         crypter.decrypt(out, firstFrameTag, firstFrameCiphertext);
         verify(out.writableBytes() == suffixBytes);
