@@ -52,7 +52,7 @@ public final class ProtoLiteUtils {
    * The same value as {@link io.grpc.internal.GrpcUtil#DEFAULT_MAX_MESSAGE_SIZE}.
    */
   @VisibleForTesting
-  static final int DEFAULT_MAX_MESSAGE_SIZE = 4 * 1024 * 1024;
+  static final int DEFAULT_MAX_MESSAGE_SIZE = 1 * 1024 * 1024;
 
   /**
    * Sets the global registry for proto marshalling shared across all servers and clients.
