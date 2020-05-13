@@ -332,8 +332,8 @@ public final class AltsTsiFrameProtector implements TsiFrameProtector {
       // We leave space for suffixBytes to allow for in-place encryption. This allows for calling
       // doFinal in the JCE implementation which can be optimized better than update and doFinal.
       ByteBuf unprotectedBuf =
-          Unpooled.wrappedBuffer(new byte[
-              Ints.checkedCast(requiredUnprotectedBytesCompleteFrames + suffixBytes)]);
+          alloc.heapBuffer(
+              Ints.checkedCast(requiredUnprotectedBytesCompleteFrames + suffixBytes));
       unprotectedBuf.resetWriterIndex();
       try {
         ByteBuf out = writeSlice(unprotectedBuf, firstFrameUnprotectedLen + suffixBytes);
