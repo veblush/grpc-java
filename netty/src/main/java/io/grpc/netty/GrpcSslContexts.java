@@ -21,7 +21,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import io.grpc.ExperimentalApi;
 import io.grpc.internal.ConscryptLoader;
-import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.ssl.ApplicationProtocolConfig;
 import io.netty.handler.ssl.ApplicationProtocolConfig.Protocol;
 import io.netty.handler.ssl.ApplicationProtocolConfig.SelectedListenerFailureBehavior;
@@ -82,6 +81,17 @@ public class GrpcSslContexts {
       NEXT_PROTOCOL_VERSIONS);
 
   private static final String SUN_PROVIDER_NAME = "SunJSSE";
+
+  // io.netty.handler.codec.http2.Http2SecurityUtil.CIPHERS in a priority of AES_128_GCM_SHA256
+  private static final List<String> CIPHERS =
+      Collections.unmodifiableList(Arrays.asList(
+          "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+          "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+          "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
+          "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256",
+          "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
+          "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+      ));
 
   /**
    * Creates an SslContextBuilder with ciphers and APN appropriate for gRPC.
@@ -171,7 +181,7 @@ public class GrpcSslContexts {
         }
         return builder
             .sslProvider(SslProvider.OPENSSL)
-            .ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE)
+            .ciphers(CIPHERS, SupportedCipherSuiteFilter.INSTANCE)
             .applicationProtocolConfig(apc);
       }
       default:
@@ -205,7 +215,7 @@ public class GrpcSslContexts {
     }
     return builder
         .sslProvider(SslProvider.JDK)
-        .ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE)
+        .ciphers(CIPHERS, SupportedCipherSuiteFilter.INSTANCE)
         .applicationProtocolConfig(apc)
         .sslContextProvider(jdkProvider);
   }
