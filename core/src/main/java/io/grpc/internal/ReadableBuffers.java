@@ -314,16 +314,6 @@ public final class ReadableBuffers {
     public void reset() {
       bytes.reset();
     }
-
-    @Override
-    public boolean canUseByteBuffer() {
-      return true;
-    }
-
-    @Override
-    public ByteBuffer getByteBuffer() {
-      return (ByteBuffer) bytes;
-    }
   }
 
   /**
