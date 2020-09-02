@@ -56,7 +56,7 @@ public final class ProtoLiteUtils {
    * Assume Java 9+ if it isn't Java 7 or Java 8.
    */
   @VisibleForTesting
-  static final boolean IS_JAVA9_OR_HIGHER;
+  static final boolean IS_JAVA9_OR_HIGHER = true;
 
   /**
    * The same value as {@link io.grpc.internal.GrpcUtil#DEFAULT_MAX_MESSAGE_SIZE}.
@@ -70,6 +70,7 @@ public final class ProtoLiteUtils {
   @VisibleForTesting
   static final int MESSAGE_ZERO_COPY_THRESHOLD = 64 * 1024;
 
+  /*
   static {
     boolean isJava9OrHigher = true;
     try {
@@ -79,6 +80,7 @@ public final class ProtoLiteUtils {
     }
     IS_JAVA9_OR_HIGHER = isJava9OrHigher;
   }
+  */
 
   /**
    * Sets the global registry for proto marshalling shared across all servers and clients.
