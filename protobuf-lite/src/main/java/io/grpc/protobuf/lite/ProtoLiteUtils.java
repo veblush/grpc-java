@@ -35,6 +35,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.NoSuchMethodException;
 
 /**
  * Utility methods for using protobuf with grpc.
@@ -118,6 +121,7 @@ public final class ProtoLiteUtils {
   private static final class MessageMarshaller<T extends MessageLite>
       implements PrototypeMarshaller<T> {
     private static final ThreadLocal<Reference<byte[]>> bufs = new ThreadLocal<>();
+    private static Method newCisInstance;
 
     private final Parser<T> parser;
     private final T defaultInstance;
@@ -126,8 +130,22 @@ public final class ProtoLiteUtils {
     MessageMarshaller(T defaultInstance) {
       this.defaultInstance = defaultInstance;
       parser = (Parser<T>) defaultInstance.getParserForType();
-    }
 
+      if (newCisInstance == null) {
+        try {
+          Class[] params = {
+            byte[].class,
+            int.class,
+            int.class,
+            boolean.class
+          };
+          Method method = CodedInputStream.class.getDeclaredMethod("newInstance", params);
+          method.setAccessible(true);
+        } catch (NoSuchMethodException e) {
+          throw new RuntimeException(e.toString());
+        }
+      }
+    }
 
     @SuppressWarnings("unchecked")
     @Override
@@ -196,7 +214,12 @@ public final class ProtoLiteUtils {
               int position = size - remaining;
               throw new RuntimeException("size inaccurate: " + size + " != " + position);
             }
-            cis = CodedInputStream.newInstance(buf, 0, size);
+
+            try {
+              cis = (CodedInputStream)newCisInstance.invoke(null, new Object[] { buf, 0, size, true });
+            } catch (IllegalAccessException | InvocationTargetException e) {
+              throw new RuntimeException(e.toString());
+            }
             cis.enableAliasing(true);
           } else if (size == 0) {
             return defaultInstance;
