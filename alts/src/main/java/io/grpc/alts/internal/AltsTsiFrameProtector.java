@@ -26,9 +26,13 @@ import io.netty.buffer.ByteBufAllocator;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /** Frame protector that uses the ALTS framing. */
 public final class AltsTsiFrameProtector implements TsiFrameProtector {
+  private static final Logger logger = Logger.getLogger(AltsTsiFrameProtector.class.getName());
+
   private static final int HEADER_LEN_FIELD_BYTES = 4;
   private static final int HEADER_TYPE_FIELD_BYTES = 4;
   private static final int HEADER_BYTES = HEADER_LEN_FIELD_BYTES + HEADER_TYPE_FIELD_BYTES;
@@ -257,6 +261,7 @@ public final class AltsTsiFrameProtector implements TsiFrameProtector {
       while (header.isWritable()) {
         ByteBuf in = unhandledBufs.get(unhandledIdx);
         int headerBytesToRead = Math.min(in.readableBytes(), header.writableBytes());
+        logger.log(Level.INFO, "header.writeBytes({0})", new Object[]{headerBytesToRead});
         header.writeBytes(in, headerBytesToRead);
         unhandledBytes -= headerBytesToRead;
         if (!in.isReadable()) {
@@ -298,12 +303,14 @@ public final class AltsTsiFrameProtector implements TsiFrameProtector {
         if (buf.readableBytes() <= requiredSuffixBytes) {
           // We use the whole buffer.
           requiredSuffixBytes -= buf.readableBytes();
+          logger.log(Level.INFO, "firstFrameTag.writeBytes({0}) #1", new Object[]{buf.readableBytes()});
           firstFrameTag.writeBytes(buf);
           if (requiredSuffixBytes == 0) {
             break;
           }
           unhandledIdx++;
         } else {
+          logger.log(Level.INFO, "firstFrameTag.writeBytes({0}) #2", new Object[]{requiredSuffixBytes});
           firstFrameTag.writeBytes(buf, requiredSuffixBytes);
           break;
         }
