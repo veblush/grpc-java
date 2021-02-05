@@ -197,6 +197,7 @@ public final class ProtoLiteUtils {
               throw new RuntimeException("size inaccurate: " + size + " != " + position);
             }
             cis = CodedInputStream.newInstance(buf, 0, size);
+            cis.enableAliasing(true);
           } else if (size == 0) {
             return defaultInstance;
           }
