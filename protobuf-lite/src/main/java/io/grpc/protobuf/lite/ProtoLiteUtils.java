@@ -38,7 +38,8 @@ import java.lang.ref.WeakReference;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.NoSuchMethodException;
-
+import java.util.logging.Level;
+import java.util.logging.Logger;
 /**
  * Utility methods for using protobuf with grpc.
  */
@@ -121,6 +122,7 @@ public final class ProtoLiteUtils {
   private static final class MessageMarshaller<T extends MessageLite>
       implements PrototypeMarshaller<T> {
     private static final ThreadLocal<Reference<byte[]>> bufs = new ThreadLocal<>();
+    private static final Logger logger = Logger.getLogger(MessageMarshaller.class.getName());
     private static Method newCisInstance;
 
     private final Parser<T> parser;
@@ -215,6 +217,8 @@ public final class ProtoLiteUtils {
               int position = size - remaining;
               throw new RuntimeException("size inaccurate: " + size + " != " + position);
             }
+
+            logger.log(Level.INFO, "parse(size={0}, stream={1})", new Object[] {size, stream});
 
             try {
               cis = (CodedInputStream)newCisInstance.invoke(null, new Object[] { buf, 0, size, true });
