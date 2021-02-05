@@ -141,7 +141,7 @@ public final class ProtoLiteUtils {
           };
           Method method = CodedInputStream.class.getDeclaredMethod("newInstance", params);
           method.setAccessible(true);
-          method = newCisInstance;
+          newCisInstance = method;
         } catch (NoSuchMethodException e) {
           throw new RuntimeException(e.toString());
         }
