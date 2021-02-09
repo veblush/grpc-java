@@ -20,8 +20,10 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
+import java.nio.InvalidMarkException;
 import java.util.ArrayDeque;
-import java.util.Queue;
+import java.util.Deque;
+import javax.annotation.Nullable;
 
 /**
  * A {@link ReadableBuffer} that is composed of 0 or more {@link ReadableBuffer}s. This provides a
@@ -34,7 +36,9 @@ import java.util.Queue;
 public class CompositeReadableBuffer extends AbstractReadableBuffer {
 
   private int readableBytes;
-  private final Queue<ReadableBuffer> buffers = new ArrayDeque<>();
+  private final Deque<ReadableBuffer> readableBuffers = new ArrayDeque<>();
+  private final Deque<ReadableBuffer> rewindableBuffers = new ArrayDeque<>();
+  private boolean marked;
 
   /**
    * Adds a new {@link ReadableBuffer} at the end of the buffer list. After a buffer is added, it is
@@ -43,16 +47,24 @@ public class CompositeReadableBuffer extends AbstractReadableBuffer {
    * this {@code CompositeBuffer}.
    */
   public void addBuffer(ReadableBuffer buffer) {
+    boolean markHead = marked && readableBuffers.isEmpty();
+    enqueueBuffer(buffer);
+    if (markHead) {
+      readableBuffers.peek().mark();
+    }
+  }
+
+  private void enqueueBuffer(ReadableBuffer buffer) {
     if (!(buffer instanceof CompositeReadableBuffer)) {
-      buffers.add(buffer);
+      readableBuffers.add(buffer);
       readableBytes += buffer.readableBytes();
       return;
     }
 
     CompositeReadableBuffer compositeBuffer = (CompositeReadableBuffer) buffer;
-    while (!compositeBuffer.buffers.isEmpty()) {
-      ReadableBuffer subBuffer = compositeBuffer.buffers.remove();
-      buffers.add(subBuffer);
+    while (!compositeBuffer.readableBuffers.isEmpty()) {
+      ReadableBuffer subBuffer = compositeBuffer.readableBuffers.remove();
+      readableBuffers.add(subBuffer);
     }
     readableBytes += compositeBuffer.readableBytes;
     compositeBuffer.readableBytes = 0;
@@ -136,27 +148,73 @@ public class CompositeReadableBuffer extends AbstractReadableBuffer {
 
   @Override
   public CompositeReadableBuffer readBytes(int length) {
-    checkReadable(length);
-    readableBytes -= length;
-
-    CompositeReadableBuffer newBuffer = new CompositeReadableBuffer();
-    while (length > 0) {
-      ReadableBuffer buffer = buffers.peek();
-      if (buffer.readableBytes() > length) {
+    final CompositeReadableBuffer newBuffer = new CompositeReadableBuffer();
+    execute(new ReadOperation() {
+      @Override
+      int readInternal(ReadableBuffer buffer, int length) {
         newBuffer.addBuffer(buffer.readBytes(length));
-        length = 0;
-      } else {
-        newBuffer.addBuffer(buffers.poll());
-        length -= buffer.readableBytes();
+        return 0;
       }
-    }
+    }, length);
     return newBuffer;
   }
 
   @Override
+  public void mark() {
+    while (!rewindableBuffers.isEmpty()) {
+      rewindableBuffers.remove().close();
+    }
+    marked = true;
+    ReadableBuffer buffer = readableBuffers.peek();
+    if (buffer != null) {
+      buffer.mark();
+    }
+  }
+
+  @Override
+  public void reset() {
+    if (!marked) {
+      throw new InvalidMarkException();
+    }
+    ReadableBuffer buffer;
+    if ((buffer = readableBuffers.peek()) != null) {
+      int currentRemain = buffer.readableBytes();
+      buffer.reset();
+      readableBytes += (buffer.readableBytes() - currentRemain);
+    }
+    while ((buffer = rewindableBuffers.pollLast()) != null) {
+      buffer.reset();
+      readableBuffers.addFirst(buffer);
+      readableBytes += buffer.readableBytes();
+    }
+  }
+
+  @Override
+  public boolean getByteBufferSupported() {
+    for (ReadableBuffer buffer : readableBuffers) {
+      if (!buffer.getByteBufferSupported()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  @Nullable
+  @Override
+  public ByteBuffer getByteBuffer() {
+    if (readableBuffers.isEmpty()) {
+      return null;
+    }
+    return readableBuffers.peek().getByteBuffer();
+  }
+
+  @Override
   public void close() {
-    while (!buffers.isEmpty()) {
-      buffers.remove().close();
+    while (!readableBuffers.isEmpty()) {
+      readableBuffers.remove().close();
+    }
+    while (!rewindableBuffers.isEmpty()) {
+      rewindableBuffers.remove().close();
     }
   }
 
@@ -167,12 +225,12 @@ public class CompositeReadableBuffer extends AbstractReadableBuffer {
   private void execute(ReadOperation op, int length) {
     checkReadable(length);
 
-    if (!buffers.isEmpty()) {
+    if (!readableBuffers.isEmpty()) {
       advanceBufferIfNecessary();
     }
 
-    for (; length > 0 && !buffers.isEmpty(); advanceBufferIfNecessary()) {
-      ReadableBuffer buffer = buffers.peek();
+    for (; length > 0 && !readableBuffers.isEmpty(); advanceBufferIfNecessary()) {
+      ReadableBuffer buffer = readableBuffers.peek();
       int lengthToCopy = Math.min(length, buffer.readableBytes());
 
       // Perform the read operation for this buffer.
@@ -195,9 +253,17 @@ public class CompositeReadableBuffer extends AbstractReadableBuffer {
    * If the current buffer is exhausted, removes and closes it.
    */
   private void advanceBufferIfNecessary() {
-    ReadableBuffer buffer = buffers.peek();
+    ReadableBuffer buffer = readableBuffers.peek();
     if (buffer.readableBytes() == 0) {
-      buffers.remove().close();
+      if (marked) {
+        rewindableBuffers.add(readableBuffers.remove());
+        ReadableBuffer next = readableBuffers.peek();
+        if (next != null) {
+          next.mark();
+        }
+      } else {
+        readableBuffers.remove().close();
+      }
     }
   }
 

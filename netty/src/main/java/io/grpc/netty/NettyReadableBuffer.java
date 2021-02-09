@@ -94,6 +94,26 @@ class NettyReadableBuffer extends AbstractReadableBuffer {
     return buffer.arrayOffset() + buffer.readerIndex();
   }
 
+  @Override
+  public void mark() {
+    buffer.markReaderIndex();
+  }
+
+  @Override
+  public void reset() {
+    buffer.resetReaderIndex();
+  }
+
+  @Override
+  public boolean getByteBufferSupported() {
+    return buffer.nioBufferCount() > 0;
+  }
+
+  @Override
+  public ByteBuffer getByteBuffer() {
+    return buffer.nioBufferCount() == 1 ? buffer.nioBuffer() : buffer.nioBuffers()[0];
+  }
+
   /**
    * If the first call to close, calls {@link ByteBuf#release} to release the internal Netty buffer.
    */
