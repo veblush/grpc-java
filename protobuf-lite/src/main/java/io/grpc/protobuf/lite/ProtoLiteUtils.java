@@ -221,11 +221,11 @@ public final class ProtoLiteUtils {
     private void release(Object obj) {
       try {
         Class cls = obj.getClass();
-        Method method = retainMethodMap.get(cls);
+        Method method = releaseMethodMap.get(cls);
         if (method == null) {
           method = cls.getMethod("release", new Class[0]);
           method.setAccessible(true);
-          retainMethodMap.put(cls, method);
+          releaseMethodMap.put(cls, method);
         }
         method.invoke(obj);
       } catch (Exception e) {
