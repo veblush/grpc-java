@@ -40,6 +40,15 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Field;
+import java.lang.NoSuchMethodException;
+import java.util.Iterator;
+
+import java.util.ArrayDeque;
+//import io.netty.buffer.ByteBuf;
+
 /**
  * Utility methods for using protobuf with grpc.
  */
@@ -144,16 +153,32 @@ public final class ProtoLiteUtils {
   private static final class MessageMarshaller<T extends MessageLite>
       implements PrototypeMarshaller<T> {
     private static final ThreadLocal<Reference<byte[]>> bufs = new ThreadLocal<>();
+    private static Method newCisInstance;
 
     private final Parser<T> parser;
     private final T defaultInstance;
+
+    private ArrayList<List<Object>> byteBufsQueue = new ArrayList<List<Object>>();
 
     @SuppressWarnings("unchecked")
     MessageMarshaller(T defaultInstance) {
       this.defaultInstance = defaultInstance;
       parser = (Parser<T>) defaultInstance.getParserForType();
-    }
 
+      if (newCisInstance == null) {
+          try {
+                Class[] params = {
+                  Iterable.class,
+                  boolean.class
+                };
+                Method method = CodedInputStream.class.getDeclaredMethod("newInstance", params);
+                method.setAccessible(true);
+                newCisInstance = method;
+              } catch (NoSuchMethodException e) {
+                throw new RuntimeException(e.toString());
+              }
+      }
+    }
 
     @SuppressWarnings("unchecked")
     @Override
@@ -170,6 +195,37 @@ public final class ProtoLiteUtils {
     @Override
     public InputStream stream(T value) {
       return new ProtoInputStream(value, parser);
+    }
+
+    private void retainByteBufs(ArrayList<Object> byteBufs) {
+      try {
+        for (Object val : byteBufs) {
+          Method retainMethod = val.getClass().getMethod("retain", new Class[0]);
+          retainMethod.setAccessible(true);
+          retainMethod.invoke(val);
+        }
+        byteBufsQueue.add(byteBufs);
+      }
+      catch (Exception e) {
+        System.out.println("retainByteBufs1:" + byteBufs.get(0).getClass().toString());
+        System.out.println(e.toString());
+        e.printStackTrace();
+      }
+      if (byteBufsQueue.size() > 10) {
+        List<Object> removingByteBufs = byteBufsQueue.remove(0);
+        try {
+          for (Object val : byteBufs) {
+            Method releaseMethod = val.getClass().getMethod("release", new Class[0]);
+            releaseMethod.setAccessible(true);
+            releaseMethod.invoke(val);
+          }
+        }
+        catch (Exception e) {
+          System.out.println("retainByteBufs2" + removingByteBufs.get(0).getClass().toString());
+          System.out.println(e.toString());
+          e.printStackTrace();
+        }
+      }
     }
 
     @Override
@@ -202,11 +258,38 @@ public final class ProtoLiteUtils {
           if (size == 0) {
             return defaultInstance;
           }
-          if (IS_JAVA9_OR_HIGHER
-              && size >= MESSAGE_ZERO_COPY_THRESHOLD
+          if (size >= MESSAGE_ZERO_COPY_THRESHOLD
               && stream instanceof HasByteBuffer
               && ((HasByteBuffer) stream).getByteBufferSupported()
               && stream.markSupported()) {
+            ArrayList<Object> byteBufs = null;
+            try {
+              Field bufferField = stream.getClass().getDeclaredField("buffer");
+              bufferField.setAccessible(true);
+              Object readableBuffer = bufferField.get(stream);
+
+              Field readableBuffersField = readableBuffer.getClass().getDeclaredField("readableBuffers");
+              readableBuffersField.setAccessible(true);
+              ArrayDeque<Object> bufferList = (ArrayDeque<Object>)readableBuffersField.get(readableBuffer);
+              
+              Object[] bufferArray = bufferList.toArray();
+              if (bufferArray.length > 0) {
+                Field bufferField2 = bufferArray[0].getClass().getDeclaredField("buffer");
+                bufferField2.setAccessible(true);
+                byteBufs = new ArrayList<Object>();
+                for (Object val : bufferArray) {
+                  Object byteBuf = bufferField2.get(val);
+                  byteBufs.add(byteBuf);
+                }
+              }
+            } catch (Exception e) {
+              System.out.println(e.toString());
+            }
+
+            if (byteBufs != null && byteBufs.size() > 0) {
+              retainByteBufs(byteBufs);
+            }
+
             List<ByteBuffer> buffers = new ArrayList<>();
             stream.mark(size);
             while (stream.available() != 0) {
@@ -214,7 +297,21 @@ public final class ProtoLiteUtils {
               stream.skip(buffer.remaining());
               buffers.add(buffer);
             }
-            cis = CodedInputStream.newInstance(buffers);
+            
+            // ReadableBuffers$BufferInputStream
+            // -> final ReadableBuffer buffer; (CompositeReadableBuffer)
+            //   -> readableBuffers: ArrayDeque
+            //     -> NettyReadableBuffer <- AbstractReadableBuffer <- ReadableBuffer
+            //
+            // stream.buffer.readableBuffers.toArray()
+            // readableBuffer.buffer.retain()
+
+            try {
+              cis = (CodedInputStream)newCisInstance.invoke(null, new Object[] { buffers, true });
+              cis.enableAliasing(true);
+            } catch (IllegalAccessException | InvocationTargetException e) {
+              throw new RuntimeException(e.toString());
+            }
           } else if (size > 0 && size <= DEFAULT_MAX_MESSAGE_SIZE) {
             Reference<byte[]> ref;
             // buf should not be used after this method has returned.
