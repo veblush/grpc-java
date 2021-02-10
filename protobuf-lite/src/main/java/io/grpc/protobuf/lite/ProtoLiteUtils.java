@@ -242,7 +242,7 @@ public final class ProtoLiteUtils {
 
       if (byteBufsQueue.size() > 3) {
         List<Object> removingByteBufs = byteBufsQueue.remove(0);
-        for (Object val : byteBufs) {
+        for (Object val : removingByteBufs) {
           release(val);
         }
       }
