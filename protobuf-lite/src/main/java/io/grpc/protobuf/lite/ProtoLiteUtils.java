@@ -47,6 +47,8 @@ import java.lang.NoSuchMethodException;
 import java.util.Iterator;
 
 import java.util.ArrayDeque;
+import java.util.Hashtable;
+
 //import io.netty.buffer.ByteBuf;
 
 /**
@@ -197,33 +199,51 @@ public final class ProtoLiteUtils {
       return new ProtoInputStream(value, parser);
     }
 
-    private void retainByteBufs(ArrayList<Object> byteBufs) {
+    private Hashtable<Class, Method> retainMethodMap = new Hashtable<Class, Method>();
+    private Hashtable<Class, Method> releaseMethodMap = new Hashtable<Class, Method>();
+
+    private void retain(Object obj) {
       try {
-        for (Object val : byteBufs) {
-          Method retainMethod = val.getClass().getMethod("retain", new Class[0]);
-          retainMethod.setAccessible(true);
-          retainMethod.invoke(val);
+        Class cls = obj.getClass();
+        Method method = retainMethodMap.get(cls);
+        if (method == null) {
+          method = cls.getMethod("retain", new Class[0]);
+          method.setAccessible(true);
+          retainMethodMap.put(cls, method);
         }
-        byteBufsQueue.add(byteBufs);
-      }
-      catch (Exception e) {
-        System.out.println("retainByteBufs1:" + byteBufs.get(0).getClass().toString());
+        method.invoke(obj);
+      } catch (Exception e) {
         System.out.println(e.toString());
         e.printStackTrace();
       }
-      if (byteBufsQueue.size() > 10) {
-        List<Object> removingByteBufs = byteBufsQueue.remove(0);
-        try {
-          for (Object val : byteBufs) {
-            Method releaseMethod = val.getClass().getMethod("release", new Class[0]);
-            releaseMethod.setAccessible(true);
-            releaseMethod.invoke(val);
-          }
+    }
+
+    private void release(Object obj) {
+      try {
+        Class cls = obj.getClass();
+        Method method = retainMethodMap.get(cls);
+        if (method == null) {
+          method = cls.getMethod("release", new Class[0]);
+          method.setAccessible(true);
+          retainMethodMap.put(cls, method);
         }
-        catch (Exception e) {
-          System.out.println("retainByteBufs2" + removingByteBufs.get(0).getClass().toString());
-          System.out.println(e.toString());
-          e.printStackTrace();
+        method.invoke(obj);
+      } catch (Exception e) {
+        System.out.println(e.toString());
+        e.printStackTrace();
+      }
+    }
+
+    private void retainByteBufs(ArrayList<Object> byteBufs) {
+      for (Object val : byteBufs) {
+        retain(val);
+      }
+      byteBufsQueue.add(byteBufs);
+
+      if (byteBufsQueue.size() > 3) {
+        List<Object> removingByteBufs = byteBufsQueue.remove(0);
+        for (Object val : byteBufs) {
+          release(val);
         }
       }
     }
