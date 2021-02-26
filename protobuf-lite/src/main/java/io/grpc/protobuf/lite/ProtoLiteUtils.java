@@ -48,6 +48,9 @@ import java.util.Iterator;
 
 import java.util.ArrayDeque;
 import java.util.Hashtable;
+import java.util.stream.Collectors;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.UnsafeByteOperations;
 
 //import io.netty.buffer.ByteBuf;
 
@@ -168,17 +171,17 @@ public final class ProtoLiteUtils {
       parser = (Parser<T>) defaultInstance.getParserForType();
 
       if (newCisInstance == null) {
-          try {
-                Class[] params = {
-                  Iterable.class,
-                  boolean.class
-                };
-                Method method = CodedInputStream.class.getDeclaredMethod("newInstance", params);
-                method.setAccessible(true);
-                newCisInstance = method;
-              } catch (NoSuchMethodException e) {
-                throw new RuntimeException(e.toString());
-              }
+        try {
+          Class[] params = {
+            Iterable.class,
+            boolean.class
+          };
+          Method method = CodedInputStream.class.getDeclaredMethod("newInstance", params);
+          method.setAccessible(true);
+          newCisInstance = method;
+        } catch (NoSuchMethodException e) {
+          throw new RuntimeException(e.toString());
+        }
       }
     }
 
@@ -326,12 +329,25 @@ public final class ProtoLiteUtils {
             // stream.buffer.readableBuffers.toArray()
             // readableBuffer.buffer.retain()
 
-            try {
-              cis = (CodedInputStream)newCisInstance.invoke(null, new Object[] { buffers, true });
-              cis.enableAliasing(true);
-            } catch (IllegalAccessException | InvocationTargetException e) {
-              throw new RuntimeException(e.toString());
-            }
+            // (1) for each ByteBuffer in your list, use UnsafeByteOperations to create a ByteString
+            // (2) call ByteString.copyFrom(List<ByteString>) which will create your rope (aside, the method name is terrible)
+            // (3) call rope.newCodedInput() which will now be powered by your new call site
+
+            List<ByteString> byteStrings = new ArrayList<>();
+            for (ByteBuffer buffer : buffers) {
+              byteStrings.add(UnsafeByteOperations.unsafeWrap(buffer));
+            }            
+            ByteString finalOne = ByteString.copyFrom(byteStrings);
+
+            cis = finalOne.newCodedInput();
+            cis.enableAliasing(true);
+
+            //try {
+            //  cis = (CodedInputStream)newCisInstance.invoke(null, new Object[] { buffers, true });
+            //  cis.enableAliasing(true);
+            //} catch (IllegalAccessException | InvocationTargetException e) {
+            //  throw new RuntimeException(e.toString());
+            //}
           } else if (size > 0 && size <= DEFAULT_MAX_MESSAGE_SIZE) {
             Reference<byte[]> ref;
             // buf should not be used after this method has returned.
