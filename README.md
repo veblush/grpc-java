@@ -110,7 +110,7 @@ For protobuf-based codegen integrated with the Maven build system, you can use
       <artifactId>protobuf-maven-plugin</artifactId>
       <version>0.6.1</version>
       <configuration>
-        <protocArtifact>com.google.protobuf:protoc:3.14.1:exe:${os.detected.classifier}</protocArtifact>
+        <protocArtifact>com.google.protobuf:protoc:3.15.9:exe:${os.detected.classifier}</protocArtifact>
         <pluginId>grpc-java</pluginId>
         <pluginArtifact>io.grpc:protoc-gen-grpc-java:1.35.0:exe:${os.detected.classifier}</pluginArtifact>
       </configuration>
@@ -138,7 +138,7 @@ plugins {
 
 protobuf {
   protoc {
-    artifact = "com.google.protobuf:protoc:3.14.1"
+    artifact = "com.google.protobuf:protoc:3.15.9"
   }
   plugins {
     grpc {

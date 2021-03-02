@@ -25,7 +25,7 @@ targetCompatibility = 1.7
 // updating the version in our release process.
 def grpcVersion = '1.35.1-SNAPSHOT' // CURRENT_GRPC_VERSION
 def nettyTcNativeVersion = '2.0.34.Final'
-def protocVersion = '3.14.1'
+def protocVersion = '3.15.9'
 
 dependencies {
     implementation "io.grpc:grpc-netty:${grpcVersion}"
